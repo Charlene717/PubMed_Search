@@ -33,19 +33,32 @@
       W2Vs  <-  as.numeric(tbl[[document]])
       documents <- as.character(tbl[[document]]) 
       
-      doc_len <- length(documents)
-      mean_doc_len <- mean(vapply(documents, length, FUN.VALUE = integer(1)))
+      
+      ## https://rdrr.io/cran/superml/src/R/bm25.R
+      ## Not suitable
+      # doc_len <- length(documents)
+      # mean_doc_len <- mean(vapply(documents, length, FUN.VALUE = integer(1)))
+      
+      ## Count doc_len & mean_doc_len
+      tbl %>% group_by(book) %>% mutate(.,Ld=sum(n)) -> doc_len
+      #doc_len <- doc_len[!duplicated(doc_len[,c('book')]),]
+      #book_BM25 %>% group_by(book) %>% mutate(.,Ld=sum(n)) -> doc_len
+      doc_len <- doc_len$Ld
+      mean_doc_len <- sum(tbl$n)/length(doc_totals)
+      
+      
       
       if (mode==1){
       Score <- sum(BM25s*W2Vs)/(1 - b + b *(doc_len / mean_doc_len))
       }else{
       Score <- sum(BM25s+W2Vs)/(1 - b + b *(doc_len / mean_doc_len))  
       }
-      
-      return(Score)    
+      tbl$Score <- Score
+      return(tbl)    
     }
 
-  BM25_W2V_Score(book_BM25, tf_idf, bm25, book)
+# ##### Try #####
+  BM25_W2V_Score.df <- BM25_W2V_Score(book_BM25, tf_idf, bm25, book)
 
 
 
