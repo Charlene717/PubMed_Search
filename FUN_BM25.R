@@ -1,5 +1,5 @@
 # # https://rdrr.io/cran/superml/src/R/bm25.R
-# view(bind_tf_idf)
+# View(bind_tf_idf)
 
 ##### version info #####
   # platform       x86_64-w64-mingw32          
