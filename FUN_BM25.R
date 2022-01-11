@@ -76,8 +76,8 @@
     return(tbl)    
   }
   
-# ##### Try #####
-  book_BM25 <- book_words %>%
-    BM25Score(word, book, n)
-
-  plot(book_BM25$tf_idf ,book_BM25$bm25)
+# # ##### Try #####
+#   book_BM25 <- book_words %>%
+#     BM25Score(word, book, n)
+# 
+#   plot(book_BM25$tf_idf ,book_BM25$bm25)
