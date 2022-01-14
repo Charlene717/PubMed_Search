@@ -78,11 +78,47 @@
 ##### 3.3 The BM25() function #####
   source("FUN_BM25.R")
   book_BM25.df <- book_words.df %>%
-               BM25Score(word, book, n)
-
+                  BM25Score(word, book, n)
   plot(book_BM25.df$tf_idf ,book_BM25.df$bm25)
   
-
+  ## Check
+  doc_totals <- data.frame(Ld = tapply(book_BM25.df$n, book_BM25.df$book, sum))
+  book_BM25_Check1 <- book_BM25.df[1,]
+  WordCount.df <- as.data.frame(table(book_BM25.df$word))
+  WordCount_W.df <- WordCount.df[WordCount.df$Var1 == book_BM25_Check1$word,]
+  
+  N <- nrow(doc_totals)
+  dft <- WordCount_W.df$Freq
+  k=1.25
+  b=0.75
+  
+  Ld <- total_words.df[total_words.df$book == book_BM25_Check1$book,2]
+  tftd <- book_BM25_Check1$n/Ld
+  Lave <- mean(total_words.df$total)
+  book_BM25_Check1.R <- log10((N-dft+0.5)/(dft+0.5))*(k+1)*tftd/(k*((1-b)+b*(Ld/Lave))+tftd)
+  
+  ## Check2
+  doc_totals <- data.frame(Ld = tapply(book_BM25.df$n, book_BM25.df$book, sum))
+  book_BM25_Check1 <- book_words.df
+  WordCount.df <- as.data.frame(table(book_BM25.df$word))
+  #WordCount_W.df <- WordCount.df[WordCount.df$Var1 == book_BM25_Check1$word,]
+  
+  N <- nrow(doc_totals)
+  #dft <- WordCount.df$Freq
+  colnames(WordCount.df) <- c("word","dft")
+  
+  book_BM25_Check1 <- left_join(book_BM25_Check1,WordCount.df,by="word")
+  dft <- book_BM25_Check1$dft
+  k=1.25
+  b=0.75
+  
+  #Ld <- left_join( book_BM25_Check1,total_words.df,by="book")
+  tftd <- book_BM25_Check1$n/book_BM25_Check1$total
+  Lave <- mean(total_words.df$total)
+  book_BM25_Check1 %>% mutate(bm25=log10((N-dft+0.5)/(dft+0.5))*(k+1)*tftd/(k*((1-b)+b*(book_BM25_Check1$total/Lave))+tftd)) ->book_BM25_Check1 
+  sum(round(book_BM25.df$bm25,4) == round(book_BM25_Check1$bm25,4))
+  
+  
 ##### Current path and new folder setting  ##### 
   W2V.Path = setwd(getwd())
   W2V_Version = "20220111_W2V"
