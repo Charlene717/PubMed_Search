@@ -76,9 +76,9 @@
     scale_y_log10()
 
 ##### 3.3 The BM25() function #####
-  source("FUN_BM25.R")
+  source("FUN_BM25_V2.R")
   book_BM25.df <- book_words.df %>%
-                  BM25Score(word, book, n)
+                  BM25Score(word, book, n,total)
   plot(book_BM25.df$tf_idf ,book_BM25.df$bm25)
   
   ## Check
