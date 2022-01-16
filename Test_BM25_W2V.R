@@ -44,15 +44,16 @@ memory.limit(150000)
 # https://www.tidytextmining.com/tfidf.html      
 ##### 1 Term frequency in 10000 PubMed abstract #####
   t_Text.df <- Text.df[!is.na(Text.df$Abstract),]
-  
+
   PubMed_word.df <- t_Text.df %>%
-    unnest_tokens(word, Abstract) %>%
-    count(PMID, word, sort = TRUE)
+                    unnest_tokens(word, Abstract) %>%
+                    count(PMID, word, sort = TRUE)
+
   
   ## Ref: https://github.com/tidyverse/dplyr/issues/505
   total_words.df <- PubMed_word.df %>% 
-    group_by(PMID) %>% 
-    summarise(total = sum(n)) 
+                    group_by(PMID) %>% 
+                    summarise(total = sum(n)) 
   
   PubMed_word.df <- left_join(PubMed_word.df, total_words.df)
   
@@ -164,18 +165,6 @@ memory.limit(150000)
   summary(PMID_BM25_W2V.df$Score)
 
 ##### 5. Visualization #####
-  # p1 <- ggplot(PMID_BM25_W2V.df,aes(x=bm25,y=Score)) + 
-  #   geom_point(shape=19) + xlab("bm25") + ylab("Score(bm25&W2V)")
-  # 
-  # p2 <- ggplot(PMID_BM25_W2V.df,aes(x=tf_idf,y=Score)) + 
-  #   geom_point(shape=19) + xlab("tf_idf") + ylab("Score(bm25&W2V)")
-  # 
-  # p3 <- ggplot(PMID_BM25_W2V.df,aes(x=tf_idf,y=bm25)) + 
-  #   geom_point(shape=19) + xlab("tf_idf") + ylab("bm25")
-  # 
-  # # https://www.itread01.com/hkpfclq.html
-  # plot_grid(p1,p2,p3)
-  
   plot(PMID_BM25_W2V.df$tf_idf ,PMID_BM25_W2V.df$bm25)  
   plot(PMID_BM25_W2V.df$Score ,PMID_BM25_W2V.df$bm25)  
   plot(PMID_BM25_W2V.df$Score ,PMID_BM25_W2V.df$similarity)
@@ -206,6 +195,51 @@ memory.limit(150000)
 
   PMIDScore_Q.set <- quantile(PMID_Rank.df$PMIDScore, c(0.25, 0.5, 0.75))
   
-##### 6.1 Rank the Sentence in each PMID #####  
+##### 7 Rank the Sentence in each PMID #####  
   
+  # Split Para to Sent
+  source(paste0(getwd(),"/FUN_SplitPara2Sent.R"))
+  
+  PMID_Sent.df <- data.frame(matrix(nrow = 0,ncol = 4))
+  for (i in c(1:nrow(t_Text.df))) {
+    PMID_Sent_One <- SplitPara2Sent(t_Text.df[i,4])
+    PMID_Sent.df <- rbind(PMID_Sent.df,data.frame(PMID= t_Text.df[i,1],
+                                                  Line = seq(1,nrow(PMID_Sent_One),by=1),
+                                                  Sent=PMID_Sent_One))
+    
+  }
+  rm(PMID_Sent_One)
+  
+  # Count words in Sentences
+  PMID_Sent_word.df <- PMID_Sent.df %>%
+                       unnest_tokens(word, Text) %>%
+                       count(PMID,Line, word, sort = TRUE)
+  colnames(PMID_Sent_word.df)[4] <- "n.sent" 
+  
+  # Check
+  PMID_Sent_word_Test.df <- mutate(PMID_Sent.df,PMIDLine=paste0(PMID,"_",Line))
+  PMID_Sent_word_Test.df <- PMID_Sent_word_Test.df %>%
+                            unnest_tokens(word, Text) %>%
+                            count(PMIDLine, word, sort = TRUE)
+  rm(PMID_Sent_word_Test.df)
+  
+  # Join the line information to summary df
+  PMID_BM25_W2V.df <- left_join(PMID_BM25_W2V.df,PMID_Sent_word.df,by=c("PMID","word"))
+  PMID_BM25_W2V.df <- arrange(PMID_BM25_W2V.df,PMID)
+  
+  # Rank the Sentence in each PMID
+  PMID_BM25_W2V.df <- PMID_BM25_W2V.df %>% 
+                      group_by(PMID,Line) %>% 
+                      mutate(PMIDLineScore=sum(Score)) %>%
+                      arrange(desc(PMIDLineScore))
+  # https://pubmed.ncbi.nlm.nih.gov/34048775/
+  PMID_BM25_W2V.df <- arrange(PMID_BM25_W2V.df,PMID) 
+  summary(PMID_BM25_W2V.df$PMIDLineScore)
+  
+  #* Can check the Highest Score term in each line
+  PMIDLine_Rank.df <- PMID_BM25_W2V.df %>% 
+                      group_by(PMID,Line) %>% 
+                      slice(which.max(Score)) %>%
+                      arrange(desc(PMIDScore))
+  PMIDLine_Rank.df <- arrange(PMIDLine_Rank.df,PMID)
   
