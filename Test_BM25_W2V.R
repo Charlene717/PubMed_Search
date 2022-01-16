@@ -36,7 +36,8 @@ memory.limit(150000)
   
   # Cosine similarity
   CSP = 1
-
+  k=1.25
+  b=0.1
 ##### Load data #####
   load("D:/Dropbox/##_GitHub/0-R/PubMed_Search/20220112_preprocess.RData")
 
@@ -64,7 +65,7 @@ memory.limit(150000)
   # source("C:/Users/user/Desktop/Pubmed_Search/FUN_BM25.R")
   source(paste0(getwd(),"/FUN_BM25.R"))
   PMID_BM25.df <- PubMed_word.df %>%
-    BM25Score(word, PMID, n,total)
+    BM25Score(word, PMID, n,total, k=k, b=b)
   plot(PMID_BM25.df$tf_idf ,PMID_BM25.df$bm25)  
   
   ## Check_1
@@ -74,16 +75,16 @@ memory.limit(150000)
   WordCount_W.df <- WordCount.df[WordCount.df$Var1 == PMID_BM25_Check1$word,]
   
   N <- nrow(doc_totals)
+  
   dft <- WordCount_W.df$Freq
-  k=1.25
-  b=0.75
+
   
   Ld <- total_words.df[total_words.df$PMID == PMID_BM25_Check1$PMID,2]
   tftd <- PMID_BM25_Check1$n/Ld
   Lave <- mean(total_words.df$total)
   PMID_BM25_Check1_result <- log10((N-dft+0.5)/(dft+0.5))*(k+1)*tftd/(k*((1-b)+b*(Ld/Lave))+tftd)
   
-  rm(doc_totals, PMID_BM25_Check1, WordCount.df, WordCount_W.df, N, dft, k, b, Ld, tftd, Lave, PMID_BM25_Check1_result)
+  rm(doc_totals, PMID_BM25_Check1, WordCount.df, WordCount_W.df, N, dft, Ld, tftd, Lave, PMID_BM25_Check1_result)
   
   ## Check2
   doc_totals <- data.frame(Ld = tapply(PMID_BM25.df$n, PMID_BM25.df$PMID, sum))
@@ -95,8 +96,7 @@ memory.limit(150000)
   
   PMID_BM25_Check2 <- left_join(PMID_BM25_Check2,WordCount.df,by="word")
   dft <- PMID_BM25_Check2$dft
-  k=1.25
-  b=0.75
+
   
   tftd <- PMID_BM25_Check2$n/PMID_BM25_Check2$total
   Lave <- mean(total_words.df$total)
@@ -235,6 +235,16 @@ memory.limit(150000)
   # https://pubmed.ncbi.nlm.nih.gov/34048775/
   PMID_BM25_W2V.df <- arrange(PMID_BM25_W2V.df,PMID) 
   summary(PMID_BM25_W2V.df$PMIDLineScore)
+  PMID_BM25_W2V.df <- arrange(PMID_BM25_W2V.df,desc(PMIDScore))
+  
+  # Check
+  PMID_BM25_W2V_TestPL.df <- PMID_BM25_W2V.df %>% 
+                      slice(which.max(PMIDLineScore)) %>% 
+                      group_by(PMID) %>% 
+                      mutate(PMIDLineScoreCheck=sum(PMIDLineScore)) %>%
+                      arrange(desc(PMIDLineScoreCheck))
+  
+  rm(PMID_BM25_W2V_TestPL.df)
   
   #* Can check the Highest Score term in each line
   PMIDLine_Rank.df <- PMID_BM25_W2V.df %>% 
