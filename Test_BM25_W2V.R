@@ -49,8 +49,11 @@ memory.limit(150000)
   PubMed_word.df <- t_Text.df %>%
                     unnest_tokens(word, Abstract) %>%
                     count(PMID, word, sort = TRUE)
-
   
+  # Remove the stopwords
+  PubMed_word.df <- PubMed_word.df %>% anti_join(get_stopwords(),by = "word")
+  
+  # Count total words in each Sentences
   ## Ref: https://github.com/tidyverse/dplyr/issues/505
   total_words.df <- PubMed_word.df %>% 
                     group_by(PMID) %>% 
@@ -64,6 +67,7 @@ memory.limit(150000)
 ##### 2 The BM25() function #####
   # source("C:/Users/user/Desktop/Pubmed_Search/FUN_BM25.R")
   source(paste0(getwd(),"/FUN_BM25.R"))
+
   PMID_BM25.df <- PubMed_word.df %>%
     BM25Score(word, PMID, n,total, k=k, b=b)
   plot(PMID_BM25.df$tf_idf ,PMID_BM25.df$bm25)  
@@ -108,7 +112,7 @@ memory.limit(150000)
   PMID_BM25.df$bm25[is.na(round(PMID_BM25.df$bm25,4) == round(PMID_BM25_Check2$bm25,4))]
   
   
-  rm(doc_totals, PMID_BM25_Check2, WordCount.df, N, dft, k, b, tftd, Lave)
+  rm(doc_totals, PMID_BM25_Check2, WordCount.df, N, dft, tftd, Lave)
 
 ##### 3. W2V  ##### 
   ## Generate a directory
@@ -153,10 +157,13 @@ memory.limit(150000)
   t_embedding <- as.matrix(t_model)
   t_model
   t_terms
-  t_embedding
+  t_embedding <- arrange(as.data.frame(t_embedding),V1)
+  embedding <- arrange(as.data.frame(embedding),V1)
+  sum(embedding==t_embedding)
+
   rm(t_model, t_terms, t_embedding)
 
-##### 4. Combine BM25 and Cosine Similarity #####
+##### 4. Combine BM25 and Similarity #####
   colnames(nearest_term.df)[2] <- "word" 
   PMID_BM25_W2V.df <- left_join(PMID_BM25.df,nearest_term.df[2:3],by = "word")
   PMID_BM25_W2V.df$similarity[is.na(PMID_BM25_W2V.df$similarity)] <- 0
@@ -182,7 +189,7 @@ memory.limit(150000)
                   slice(which.max(Score)) %>%
                   arrange(desc(PMIDScore))
   
-  plot(PMID_Rank.df$PMIDScore, PMID_Rank.df$PMID)  
+  #plot(PMID_Rank.df$PMIDScore, PMID_Rank.df$PMID)  
   
   densityplot( ~ PMIDScore ,      
                data=PMID_Rank.df
@@ -197,7 +204,7 @@ memory.limit(150000)
   
 ##### 7 Rank the Sentence in each PMID #####  
   
-  # Split Para to Sent
+  ## Split Para to Sent
   source(paste0(getwd(),"/FUN_SplitPara2Sent.R"))
   
   PMID_Sent.df <- data.frame(matrix(nrow = 0,ncol = 4))
@@ -206,50 +213,61 @@ memory.limit(150000)
     PMID_Sent.df <- rbind(PMID_Sent.df,data.frame(PMID= t_Text.df[i,1],
                                                   Line = seq(1,nrow(PMID_Sent_One),by=1),
                                                   Sent=PMID_Sent_One))
-    
   }
   rm(PMID_Sent_One)
+
   
-  # Count words in Sentences
+  ## Count words in Sentences
+  PMID_Sent.df <- mutate(PMID_Sent.df,PMIDLine=paste0(PMID,"_",Line))
   PMID_Sent_word.df <- PMID_Sent.df %>%
-                       unnest_tokens(word, Text) %>%
-                       count(PMID,Line, word, sort = TRUE)
-  colnames(PMID_Sent_word.df)[4] <- "n.sent" 
+                        unnest_tokens(word, Text) %>%
+                        count(PMIDLine,PMID,Line, word, sort = TRUE)
+  colnames(PMID_Sent_word.df)[5] <- "n.sent" 
+  PMID_Sent_word.df <- arrange(PMID_Sent_word.df,PMID)
   
-  # Check
-  PMID_Sent_word_Test.df <- mutate(PMID_Sent.df,PMIDLine=paste0(PMID,"_",Line))
-  PMID_Sent_word_Test.df <- PMID_Sent_word_Test.df %>%
-                            unnest_tokens(word, Text) %>%
-                            count(PMIDLine, word, sort = TRUE)
-  rm(PMID_Sent_word_Test.df)
+  # Remove the stopwords
+  PMID_Sent_word.df <- PMID_Sent_word.df %>% anti_join(get_stopwords(), by = "word")
   
-  # Join the line information to summary df
-  PMID_BM25_W2V.df <- left_join(PMID_BM25_W2V.df,PMID_Sent_word.df,by=c("PMID","word"))
+  # Count total words in each Sentences
+  total_Sent_words.df <- PMID_Sent_word.df  %>% 
+                        group_by(PMID,Line) %>% 
+                        summarise(total.Sent = sum(n.sent),.groups="drop") 
+  
+  PMID_Sent_word.df  <- left_join(PMID_Sent_word.df , total_Sent_words.df,
+                                  by = c("PMID", "Line"))
+  
+  PMID_Sent_word.df <- arrange(PMID_Sent_word.df,PMID,Line) 
+  
+  
+  # BM25Score for Sent
+  PMID_BM25_Sent_word.df <- PMID_Sent_word.df %>%
+                            BM25Score(word, PMIDLine, n.sent, total.Sent, k=k, b=b)
+  plot(PMID_BM25_Sent_word.df$tf_idf ,PMID_BM25_Sent_word.df$bm25)
+  
+  # Join the Sentence information to summary df
+  PMID_BM25_W2V.df <- left_join(PMID_BM25_W2V.df,PMID_BM25_Sent_word.df,by=c("PMID","word"))
   PMID_BM25_W2V.df <- arrange(PMID_BM25_W2V.df,PMID)
   
+  ## Combine BM25 and Similarity
+  PMID_BM25_W2V.df <- PMID_BM25_W2V.df %>% mutate(Score.Sent = bm25.y*abs(CSP*similarity))
+  
+  summary(PMID_BM25_W2V.df$Score.Sent)
+
   # Rank the Sentence in each PMID
   PMID_BM25_W2V.df <- PMID_BM25_W2V.df %>% 
                       group_by(PMID,Line) %>% 
-                      mutate(PMIDLineScore=sum(Score)) %>%
+                      mutate(PMIDLineScore=sum(Score.Sent)) %>%
                       arrange(desc(PMIDLineScore))
   # https://pubmed.ncbi.nlm.nih.gov/34048775/
   PMID_BM25_W2V.df <- arrange(PMID_BM25_W2V.df,PMID) 
   summary(PMID_BM25_W2V.df$PMIDLineScore)
   PMID_BM25_W2V.df <- arrange(PMID_BM25_W2V.df,desc(PMIDScore))
-  
-  # Check
-  PMID_BM25_W2V_TestPL.df <- PMID_BM25_W2V.df %>% 
-                      slice(which.max(PMIDLineScore)) %>% 
-                      group_by(PMID) %>% 
-                      mutate(PMIDLineScoreCheck=sum(PMIDLineScore)) %>%
-                      arrange(desc(PMIDLineScoreCheck))
-  
-  rm(PMID_BM25_W2V_TestPL.df)
-  
+
   #* Can check the Highest Score term in each line
   PMIDLine_Rank.df <- PMID_BM25_W2V.df %>% 
                       group_by(PMID,Line) %>% 
-                      slice(which.max(Score)) %>%
+                      slice(which.max(Score.Sent)) %>%
                       arrange(desc(PMIDScore))
   PMIDLine_Rank.df <- arrange(PMIDLine_Rank.df,PMID)
+  PMIDLine_Rank.df <- PMIDLine_Rank.df[,c(1:4,11:17,24,25)]
   
