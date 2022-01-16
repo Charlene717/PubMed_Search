@@ -50,6 +50,7 @@ memory.limit(150000)
                     unnest_tokens(word, Abstract) %>%
                     count(PMID, word, sort = TRUE)
 
+  PubMed_word_RemoSW.df <- PubMed_word.df %>% anti_join(get_stopwords())
   
   ## Ref: https://github.com/tidyverse/dplyr/issues/505
   total_words.df <- PubMed_word.df %>% 
@@ -64,7 +65,7 @@ memory.limit(150000)
 ##### 2 The BM25() function #####
   # source("C:/Users/user/Desktop/Pubmed_Search/FUN_BM25.R")
   source(paste0(getwd(),"/FUN_BM25.R"))
-  PMID_BM25.df <- PubMed_word.df %>%
+  PMID_BM25.df <- PubMed_word_RemoSW.df %>%
     BM25Score(word, PMID, n,total, k=k, b=b)
   plot(PMID_BM25.df$tf_idf ,PMID_BM25.df$bm25)  
   
@@ -88,7 +89,7 @@ memory.limit(150000)
   
   ## Check2
   doc_totals <- data.frame(Ld = tapply(PMID_BM25.df$n, PMID_BM25.df$PMID, sum))
-  PMID_BM25_Check2 <- PubMed_word.df
+  PMID_BM25_Check2 <- PubMed_word_RemoSW.df
   WordCount.df <- as.data.frame(table(PMID_BM25.df$word))
   
   N <- nrow(doc_totals)
